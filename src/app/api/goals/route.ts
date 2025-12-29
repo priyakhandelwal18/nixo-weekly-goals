@@ -41,8 +41,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(goal);
   } catch (error) {
     console.error('Failed to add goal:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to add goal' },
+      { error: `Failed to add goal: ${errorMessage}` },
       { status: 500 }
     );
   }

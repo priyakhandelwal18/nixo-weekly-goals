@@ -124,9 +124,14 @@ export default function Home() {
       if (res.ok) {
         const newGoal = await res.json();
         setGoals([...goals, newGoal]);
+      } else {
+        const errorData = await res.json();
+        console.error('Failed to add goal:', errorData);
+        alert(`Failed to add goal: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Failed to add goal:', error);
+      alert('Failed to add goal. Please try again.');
     }
   };
 
