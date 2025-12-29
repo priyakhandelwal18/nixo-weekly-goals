@@ -1,38 +1,232 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { AppData, GoalStatus } from '@/types';
-import {
-  loadData,
-  saveData,
-  addTeamMember,
-  removeTeamMember,
-  addGoal,
-  updateGoal,
-  deleteGoal,
-  addGoalUpdate,
-} from '@/lib/storage';
+import { useState, useEffect, useCallback } from 'react';
+import { TeamMember, Goal, GoalStatus } from '@/types';
 import { getCurrentWeek, getWeekFromId } from '@/lib/utils';
 import { TeamSidebar } from '@/components/TeamSidebar';
 import { GoalsList } from '@/components/GoalsList';
 import { WeekSelector } from '@/components/WeekSelector';
 import { AddGoalModal } from '@/components/AddGoalModal';
 import { AddMemberModal } from '@/components/AddMemberModal';
+import { LoginPage } from '@/components/LoginPage';
+import { TeamOverview } from '@/components/TeamOverview';
+
+type ViewMode = 'detailed' | 'overview';
 
 export default function Home() {
-  const [data, setData] = useState<AppData | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [currentWeekId, setCurrentWeekId] = useState<string>('');
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [showAddGoalModal, setShowAddGoalModal] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('detailed');
+  const [loading, setLoading] = useState(true);
+
+  // Check authentication
+  useEffect(() => {
+    fetch('/api/auth')
+      .then((res) => res.json())
+      .then((data) => setIsAuthenticated(data.authenticated))
+      .catch(() => setIsAuthenticated(false));
+  }, []);
+
+  // Load data when authenticated
+  const loadData = useCallback(async () => {
+    if (!currentWeekId) return;
+
+    try {
+      const [membersRes, goalsRes] = await Promise.all([
+        fetch('/api/team-members'),
+        fetch(`/api/goals?weekId=${currentWeekId}`),
+      ]);
+
+      if (membersRes.ok && goalsRes.ok) {
+        const members = await membersRes.json();
+        const goalsData = await goalsRes.json();
+        setTeamMembers(members);
+        setGoals(goalsData);
+      }
+    } catch (error) {
+      console.error('Failed to load data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentWeekId]);
 
   useEffect(() => {
-    const loaded = loadData();
-    setData(loaded);
+    if (isAuthenticated && currentWeekId) {
+      loadData();
+    }
+  }, [isAuthenticated, currentWeekId, loadData]);
+
+  useEffect(() => {
     setCurrentWeekId(getCurrentWeek().id);
   }, []);
 
-  if (!data) {
+  const handleLogin = () => {
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = async () => {
+    await fetch('/api/auth', { method: 'DELETE' });
+    setIsAuthenticated(false);
+  };
+
+  const handleAddMember = async (name: string) => {
+    try {
+      const res = await fetch('/api/team-members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+
+      if (res.ok) {
+        const newMember = await res.json();
+        setTeamMembers([...teamMembers, newMember]);
+      }
+    } catch (error) {
+      console.error('Failed to add member:', error);
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    if (!confirm('Are you sure you want to remove this team member? Their goals will also be removed.')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/team-members?id=${memberId}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        setTeamMembers(teamMembers.filter((m) => m.id !== memberId));
+        setGoals(goals.filter((g) => g.assigneeId !== memberId));
+        if (selectedMemberId === memberId) {
+          setSelectedMemberId(null);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to remove member:', error);
+    }
+  };
+
+  const handleAddGoal = async (title: string, assigneeId: string, priority: 1 | 2 | 3 | 4 | 5) => {
+    try {
+      const res = await fetch('/api/goals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, assigneeId, weekId: currentWeekId, priority }),
+      });
+
+      if (res.ok) {
+        const newGoal = await res.json();
+        setGoals([...goals, newGoal]);
+      }
+    } catch (error) {
+      console.error('Failed to add goal:', error);
+    }
+  };
+
+  const handleUpdateGoalStatus = async (goalId: string, status: GoalStatus) => {
+    try {
+      const res = await fetch('/api/goals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goalId, status }),
+      });
+
+      if (res.ok) {
+        setGoals(goals.map((g) => (g.id === goalId ? { ...g, status } : g)));
+      }
+    } catch (error) {
+      console.error('Failed to update goal status:', error);
+    }
+  };
+
+  const handleUpdateGoalPriority = async (goalId: string, priority: 1 | 2 | 3 | 4 | 5) => {
+    try {
+      const res = await fetch('/api/goals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goalId, priority }),
+      });
+
+      if (res.ok) {
+        setGoals(goals.map((g) => (g.id === goalId ? { ...g, priority } : g)));
+      }
+    } catch (error) {
+      console.error('Failed to update goal priority:', error);
+    }
+  };
+
+  const handleAddGoalUpdate = async (goalId: string, content: string) => {
+    const goal = goals.find((g) => g.id === goalId);
+    if (!goal) return;
+
+    try {
+      const res = await fetch('/api/goals/updates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goalId, content, authorId: goal.assigneeId }),
+      });
+
+      if (res.ok) {
+        const newUpdate = await res.json();
+        setGoals(
+          goals.map((g) =>
+            g.id === goalId ? { ...g, updates: [...g.updates, newUpdate] } : g
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Failed to add goal update:', error);
+    }
+  };
+
+  const handleDeleteGoal = async (goalId: string) => {
+    if (!confirm('Are you sure you want to delete this goal?')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/goals?id=${goalId}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        setGoals(goals.filter((g) => g.id !== goalId));
+      }
+    } catch (error) {
+      console.error('Failed to delete goal:', error);
+    }
+  };
+
+  const handleEditGoalTitle = async (goalId: string, title: string) => {
+    try {
+      const res = await fetch('/api/goals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goalId, title }),
+      });
+
+      if (res.ok) {
+        setGoals(goals.map((g) => (g.id === goalId ? { ...g, title } : g)));
+      }
+    } catch (error) {
+      console.error('Failed to update goal title:', error);
+    }
+  };
+
+  const handleSelectWeek = (weekId: string) => {
+    setCurrentWeekId(weekId);
+    setLoading(true);
+  };
+
+  // Show loading state while checking auth
+  if (isAuthenticated === null) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
@@ -40,77 +234,16 @@ export default function Home() {
     );
   }
 
+  // Show login page if not authenticated
+  if (!isAuthenticated) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
+
   const currentWeek = getWeekFromId(currentWeekId);
-  const weeksWithCurrent = data.weeks.find((w) => w.id === currentWeekId)
-    ? data.weeks
-    : [...data.weeks, currentWeek];
-
-  const goalsForWeek = data.goals.filter((g) => g.weekId === currentWeekId);
-
-  const handleAddMember = (name: string) => {
-    const newData = addTeamMember(data, name);
-    setData(newData);
-  };
-
-  const handleRemoveMember = (memberId: string) => {
-    if (confirm('Are you sure you want to remove this team member? Their goals will also be removed.')) {
-      const newData = removeTeamMember(data, memberId);
-      setData(newData);
-      if (selectedMemberId === memberId) {
-        setSelectedMemberId(null);
-      }
-    }
-  };
-
-  const handleAddGoal = (title: string, assigneeId: string, priority: 1 | 2 | 3 | 4 | 5) => {
-    const newData = addGoal(data, title, assigneeId, currentWeekId, priority);
-    setData(newData);
-  };
-
-  const handleUpdateGoalStatus = (goalId: string, status: GoalStatus) => {
-    const newData = updateGoal(data, goalId, { status });
-    setData(newData);
-  };
-
-  const handleUpdateGoalPriority = (goalId: string, priority: 1 | 2 | 3 | 4 | 5) => {
-    const newData = updateGoal(data, goalId, { priority });
-    setData(newData);
-  };
-
-  const handleAddGoalUpdate = (goalId: string, content: string) => {
-    const goal = data.goals.find((g) => g.id === goalId);
-    if (goal) {
-      const newData = addGoalUpdate(data, goalId, content, goal.assigneeId);
-      setData(newData);
-    }
-  };
-
-  const handleDeleteGoal = (goalId: string) => {
-    if (confirm('Are you sure you want to delete this goal?')) {
-      const newData = deleteGoal(data, goalId);
-      setData(newData);
-    }
-  };
-
-  const handleEditGoalTitle = (goalId: string, title: string) => {
-    const newData = updateGoal(data, goalId, { title });
-    setData(newData);
-  };
-
-  const handleSelectWeek = (weekId: string) => {
-    setCurrentWeekId(weekId);
-    // Ensure the week exists in data
-    if (!data.weeks.find((w) => w.id === weekId)) {
-      const week = getWeekFromId(weekId);
-      const newData = { ...data, weeks: [...data.weeks, week] };
-      saveData(newData);
-      setData(newData);
-    }
-  };
 
   // Calculate completion stats
-  const totalGoals = goalsForWeek.length;
-  const doneGoals = goalsForWeek.filter((g) => g.status === 'done').length;
+  const totalGoals = goals.length;
+  const doneGoals = goals.filter((g) => g.status === 'done').length;
   const completionRate = totalGoals > 0 ? Math.round((doneGoals / totalGoals) * 100) : 0;
 
   return (
@@ -118,8 +251,8 @@ export default function Home() {
       {/* Left Sidebar - This Week */}
       <TeamSidebar
         title="This Week"
-        members={data.teamMembers}
-        goals={goalsForWeek}
+        members={teamMembers}
+        goals={goals}
         selectedMemberId={selectedMemberId}
         onSelectMember={setSelectedMemberId}
         onAddMember={() => setShowAddMemberModal(true)}
@@ -131,7 +264,7 @@ export default function Home() {
       <div className="flex-1 flex flex-col">
         <WeekSelector
           currentWeekId={currentWeekId}
-          weeks={weeksWithCurrent}
+          weeks={[currentWeek]}
           onSelectWeek={handleSelectWeek}
         />
 
@@ -165,27 +298,71 @@ export default function Home() {
             </div>
           </div>
 
-          <button
-            onClick={() => setShowAddGoalModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Add Goal
-          </button>
+          <div className="flex items-center gap-3">
+            {/* View Mode Toggle */}
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('detailed')}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  viewMode === 'detailed'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Detailed
+              </button>
+              <button
+                onClick={() => setViewMode('overview')}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  viewMode === 'overview'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Overview
+              </button>
+            </div>
+
+            <button
+              onClick={() => setShowAddGoalModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Add Goal
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="text-gray-500 hover:text-gray-700 text-sm"
+              title="Sign out"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
+          </div>
         </div>
 
-        <GoalsList
-          goals={goalsForWeek}
-          teamMembers={data.teamMembers}
-          selectedMemberId={selectedMemberId}
-          onUpdateGoalStatus={handleUpdateGoalStatus}
-          onUpdateGoalPriority={handleUpdateGoalPriority}
-          onAddGoalUpdate={handleAddGoalUpdate}
-          onDeleteGoal={handleDeleteGoal}
-          onEditGoalTitle={handleEditGoalTitle}
-        />
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          </div>
+        ) : viewMode === 'overview' ? (
+          <TeamOverview goals={goals} teamMembers={teamMembers} />
+        ) : (
+          <GoalsList
+            goals={goals}
+            teamMembers={teamMembers}
+            selectedMemberId={selectedMemberId}
+            onUpdateGoalStatus={handleUpdateGoalStatus}
+            onUpdateGoalPriority={handleUpdateGoalPriority}
+            onAddGoalUpdate={handleAddGoalUpdate}
+            onDeleteGoal={handleDeleteGoal}
+            onEditGoalTitle={handleEditGoalTitle}
+          />
+        )}
       </div>
 
       {/* Modals */}
@@ -193,7 +370,7 @@ export default function Home() {
         isOpen={showAddGoalModal}
         onClose={() => setShowAddGoalModal(false)}
         onAdd={handleAddGoal}
-        teamMembers={data.teamMembers}
+        teamMembers={teamMembers}
         defaultAssigneeId={selectedMemberId || undefined}
       />
 
