@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGoalsForWeek, addGoal, updateGoal, deleteGoal, addGoalUpdate } from '@/lib/db';
+import { getGoalsForWeek, addGoal, updateGoal, deleteGoal } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {

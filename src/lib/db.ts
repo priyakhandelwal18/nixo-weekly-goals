@@ -1,48 +1,32 @@
-import { sql } from '@vercel/postgres';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { TeamMember, Goal, GoalStatus, GoalUpdate } from '@/types';
 import { generateId, AVATAR_COLORS } from './utils';
 
-export async function initializeDatabase() {
-  await sql`
-    CREATE TABLE IF NOT EXISTS team_members (
-      id VARCHAR(255) PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      color VARCHAR(50) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `;
+let supabase: SupabaseClient | null = null;
 
-  await sql`
-    CREATE TABLE IF NOT EXISTS goals (
-      id VARCHAR(255) PRIMARY KEY,
-      title TEXT NOT NULL,
-      status VARCHAR(50) NOT NULL DEFAULT 'not_started',
-      priority INTEGER NOT NULL DEFAULT 3,
-      assignee_id VARCHAR(255) NOT NULL REFERENCES team_members(id) ON DELETE CASCADE,
-      week_id VARCHAR(50) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `;
+function getSupabase(): SupabaseClient {
+  if (supabase) return supabase;
 
-  await sql`
-    CREATE TABLE IF NOT EXISTS goal_updates (
-      id VARCHAR(255) PRIMARY KEY,
-      goal_id VARCHAR(255) NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
-      content TEXT NOT NULL,
-      author_id VARCHAR(255) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  // Create index for faster queries
-  await sql`CREATE INDEX IF NOT EXISTS idx_goals_week ON goals(week_id)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_goals_assignee ON goals(assignee_id)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_updates_goal ON goal_updates(goal_id)`;
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+
+  supabase = createClient(supabaseUrl, supabaseKey);
+  return supabase;
 }
 
 export async function getTeamMembers(): Promise<TeamMember[]> {
-  const result = await sql`SELECT * FROM team_members ORDER BY created_at`;
-  return result.rows.map((row) => ({
+  const { data, error } = await getSupabase()
+    .from('team_members')
+    .select('*')
+    .order('created_at');
+
+  if (error) throw error;
+
+  return (data || []).map((row) => ({
     id: row.id,
     name: row.name,
     color: row.color,
@@ -55,29 +39,44 @@ export async function addTeamMember(name: string): Promise<TeamMember> {
   const colorIndex = members.length % AVATAR_COLORS.length;
   const color = AVATAR_COLORS[colorIndex];
 
-  await sql`
-    INSERT INTO team_members (id, name, color)
-    VALUES (${id}, ${name}, ${color})
-  `;
+  const { error } = await getSupabase()
+    .from('team_members')
+    .insert({ id, name, color });
+
+  if (error) throw error;
 
   return { id, name, color };
 }
 
 export async function removeTeamMember(memberId: string): Promise<void> {
-  await sql`DELETE FROM team_members WHERE id = ${memberId}`;
+  const { error } = await getSupabase()
+    .from('team_members')
+    .delete()
+    .eq('id', memberId);
+
+  if (error) throw error;
 }
 
 export async function getGoalsForWeek(weekId: string): Promise<Goal[]> {
-  const goalsResult = await sql`
-    SELECT * FROM goals WHERE week_id = ${weekId} ORDER BY priority DESC, created_at
-  `;
+  const { data: goalsData, error: goalsError } = await getSupabase()
+    .from('goals')
+    .select('*')
+    .eq('week_id', weekId)
+    .order('priority', { ascending: false })
+    .order('created_at');
+
+  if (goalsError) throw goalsError;
 
   const goals: Goal[] = [];
 
-  for (const row of goalsResult.rows) {
-    const updatesResult = await sql`
-      SELECT * FROM goal_updates WHERE goal_id = ${row.id} ORDER BY created_at
-    `;
+  for (const row of goalsData || []) {
+    const { data: updatesData, error: updatesError } = await getSupabase()
+      .from('goal_updates')
+      .select('*')
+      .eq('goal_id', row.id)
+      .order('created_at');
+
+    if (updatesError) throw updatesError;
 
     goals.push({
       id: row.id,
@@ -87,7 +86,7 @@ export async function getGoalsForWeek(weekId: string): Promise<Goal[]> {
       assigneeId: row.assignee_id,
       weekId: row.week_id,
       createdAt: row.created_at,
-      updates: updatesResult.rows.map((u) => ({
+      updates: (updatesData || []).map((u) => ({
         id: u.id,
         content: u.content,
         authorId: u.author_id,
@@ -107,10 +106,18 @@ export async function addGoal(
 ): Promise<Goal> {
   const id = generateId();
 
-  await sql`
-    INSERT INTO goals (id, title, status, priority, assignee_id, week_id)
-    VALUES (${id}, ${title}, 'not_started', ${priority}, ${assigneeId}, ${weekId})
-  `;
+  const { error } = await getSupabase()
+    .from('goals')
+    .insert({
+      id,
+      title,
+      status: 'not_started',
+      priority,
+      assignee_id: assigneeId,
+      week_id: weekId,
+    });
+
+  if (error) throw error;
 
   return {
     id,
@@ -128,19 +135,41 @@ export async function updateGoal(
   goalId: string,
   updates: Partial<Pick<Goal, 'title' | 'status' | 'priority'>>
 ): Promise<void> {
+  const updateData: Record<string, string | number> = {};
+
   if (updates.title !== undefined) {
-    await sql`UPDATE goals SET title = ${updates.title} WHERE id = ${goalId}`;
+    updateData.title = updates.title;
   }
   if (updates.status !== undefined) {
-    await sql`UPDATE goals SET status = ${updates.status} WHERE id = ${goalId}`;
+    updateData.status = updates.status;
   }
   if (updates.priority !== undefined) {
-    await sql`UPDATE goals SET priority = ${updates.priority} WHERE id = ${goalId}`;
+    updateData.priority = updates.priority;
+  }
+
+  if (Object.keys(updateData).length > 0) {
+    const { error } = await getSupabase()
+      .from('goals')
+      .update(updateData)
+      .eq('id', goalId);
+
+    if (error) throw error;
   }
 }
 
 export async function deleteGoal(goalId: string): Promise<void> {
-  await sql`DELETE FROM goals WHERE id = ${goalId}`;
+  // First delete related updates
+  await getSupabase()
+    .from('goal_updates')
+    .delete()
+    .eq('goal_id', goalId);
+
+  const { error } = await getSupabase()
+    .from('goals')
+    .delete()
+    .eq('id', goalId);
+
+  if (error) throw error;
 }
 
 export async function addGoalUpdate(
@@ -150,10 +179,16 @@ export async function addGoalUpdate(
 ): Promise<GoalUpdate> {
   const id = generateId();
 
-  await sql`
-    INSERT INTO goal_updates (id, goal_id, content, author_id)
-    VALUES (${id}, ${goalId}, ${content}, ${authorId})
-  `;
+  const { error } = await getSupabase()
+    .from('goal_updates')
+    .insert({
+      id,
+      goal_id: goalId,
+      content,
+      author_id: authorId,
+    });
+
+  if (error) throw error;
 
   return {
     id,

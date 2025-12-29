@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 const TEAM_PASSWORD = process.env.TEAM_PASSWORD || 'nixo2024';
 
 export async function POST(request: NextRequest) {
