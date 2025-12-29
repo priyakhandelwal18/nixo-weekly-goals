@@ -1,19 +1,19 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { TeamMember, Goal, GoalStatus, Initiative } from '@/types';
+import { TeamMember, Goal, GoalStatus, Milestone } from '@/types';
 import { getCurrentWeek, getWeekFromId, getAdjacentWeek } from '@/lib/utils';
 import { TeamSidebar } from '@/components/TeamSidebar';
 import { GoalsList } from '@/components/GoalsList';
 import { WeekSelector } from '@/components/WeekSelector';
 import { AddGoalModal } from '@/components/AddGoalModal';
 import { AddMemberModal } from '@/components/AddMemberModal';
-import { AddInitiativeModal } from '@/components/AddInitiativeModal';
+import { AddMilestoneModal } from '@/components/AddMilestoneModal';
 import { LoginPage } from '@/components/LoginPage';
 import { OverviewList } from '@/components/OverviewList';
-import { InitiativesList } from '@/components/InitiativesList';
+import { MilestonesList } from '@/components/MilestonesList';
 
-type ViewMode = 'detailed' | 'overview' | 'initiatives';
+type ViewMode = 'detailed' | 'overview' | 'milestones';
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -21,12 +21,12 @@ export default function Home() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [allGoals, setAllGoals] = useState<Goal[]>([]);
   const [lastWeekGoals, setLastWeekGoals] = useState<Goal[]>([]);
-  const [initiatives, setInitiatives] = useState<Initiative[]>([]);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [currentWeekId, setCurrentWeekId] = useState<string>('');
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [showAddGoalModal, setShowAddGoalModal] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
-  const [showAddInitiativeModal, setShowAddInitiativeModal] = useState(false);
+  const [showAddMilestoneModal, setShowAddMilestoneModal] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('detailed');
   const [loading, setLoading] = useState(true);
 
@@ -45,11 +45,11 @@ export default function Home() {
     const lastWeekId = getAdjacentWeek(currentWeekId, 'prev');
 
     try {
-      const [membersRes, goalsRes, lastWeekGoalsRes, initiativesRes] = await Promise.all([
+      const [membersRes, goalsRes, lastWeekGoalsRes, milestonesRes] = await Promise.all([
         fetch('/api/team-members'),
         fetch(`/api/goals?weekId=${currentWeekId}`),
         fetch(`/api/goals?weekId=${lastWeekId}`),
-        fetch('/api/initiatives'),
+        fetch('/api/milestones'),
       ]);
 
       if (membersRes.ok && goalsRes.ok) {
@@ -64,12 +64,12 @@ export default function Home() {
         setLastWeekGoals(lastWeekGoalsData);
       }
 
-      if (initiativesRes.ok) {
-        const initiativesData = await initiativesRes.json();
-        setInitiatives(initiativesData);
+      if (milestonesRes.ok) {
+        const milestonesData = await milestonesRes.json();
+        setMilestones(milestonesData);
       }
 
-      // Load all goals for initiative linking display
+      // Load all goals for milestone linking display
       const allGoalsRes = await fetch('/api/goals/all');
       if (allGoalsRes.ok) {
         const allGoalsData = await allGoalsRes.json();
@@ -252,20 +252,20 @@ export default function Home() {
     }
   };
 
-  const handleLinkGoalToInitiative = async (goalId: string, initiativeId: string | null) => {
+  const handleLinkGoalToMilestone = async (goalId: string, milestoneId: string | null) => {
     try {
       const res = await fetch('/api/goals', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goalId, initiativeId }),
+        body: JSON.stringify({ goalId, milestoneId }),
       });
 
       if (res.ok) {
-        setGoals(goals.map((g) => (g.id === goalId ? { ...g, initiativeId: initiativeId || undefined } : g)));
-        setAllGoals(allGoals.map((g) => (g.id === goalId ? { ...g, initiativeId: initiativeId || undefined } : g)));
+        setGoals(goals.map((g) => (g.id === goalId ? { ...g, milestoneId: milestoneId || undefined } : g)));
+        setAllGoals(allGoals.map((g) => (g.id === goalId ? { ...g, milestoneId: milestoneId || undefined } : g)));
       }
     } catch (error) {
-      console.error('Failed to link goal to initiative:', error);
+      console.error('Failed to link goal to milestone:', error);
     }
   };
 
@@ -274,56 +274,56 @@ export default function Home() {
     setLoading(true);
   };
 
-  // Initiative handlers
-  const handleAddInitiative = async (title: string, deadline: string, assigneeId: string) => {
+  // Milestone handlers
+  const handleAddMilestone = async (title: string, deadline: string) => {
     try {
-      const res = await fetch('/api/initiatives', {
+      const res = await fetch('/api/milestones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, deadline, assigneeId }),
+        body: JSON.stringify({ title, deadline }),
       });
 
       if (res.ok) {
-        const newInitiative = await res.json();
-        setInitiatives([...initiatives, newInitiative]);
+        const newMilestone = await res.json();
+        setMilestones([...milestones, newMilestone]);
       } else {
         const errorData = await res.json();
-        console.error('Failed to add initiative:', errorData);
-        alert(`Failed to add initiative: ${errorData.error || 'Unknown error'}`);
+        console.error('Failed to add milestone:', errorData);
+        alert(`Failed to add milestone: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error('Failed to add initiative:', error);
-      alert('Failed to add initiative. Please try again.');
+      console.error('Failed to add milestone:', error);
+      alert('Failed to add milestone. Please try again.');
     }
   };
 
-  const handleToggleInitiativeAchieved = async (initiativeId: string, achieved: boolean) => {
+  const handleToggleMilestoneAchieved = async (milestoneId: string, achieved: boolean) => {
     try {
-      const res = await fetch('/api/initiatives', {
+      const res = await fetch('/api/milestones', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initiativeId, achieved }),
+        body: JSON.stringify({ milestoneId, achieved }),
       });
 
       if (res.ok) {
-        setInitiatives(initiatives.map((i) => (i.id === initiativeId ? { ...i, achieved } : i)));
+        setMilestones(milestones.map((m) => (m.id === milestoneId ? { ...m, achieved } : m)));
       }
     } catch (error) {
-      console.error('Failed to update initiative:', error);
+      console.error('Failed to update milestone:', error);
     }
   };
 
-  const handleDeleteInitiative = async (initiativeId: string) => {
+  const handleDeleteMilestone = async (milestoneId: string) => {
     try {
-      const res = await fetch(`/api/initiatives?id=${initiativeId}`, {
+      const res = await fetch(`/api/milestones?id=${milestoneId}`, {
         method: 'DELETE',
       });
 
       if (res.ok) {
-        setInitiatives(initiatives.filter((i) => i.id !== initiativeId));
+        setMilestones(milestones.filter((m) => m.id !== milestoneId));
       }
     } catch (error) {
-      console.error('Failed to delete initiative:', error);
+      console.error('Failed to delete milestone:', error);
     }
   };
 
@@ -422,26 +422,26 @@ export default function Home() {
                 Overview
               </button>
               <button
-                onClick={() => setViewMode('initiatives')}
+                onClick={() => setViewMode('milestones')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                  viewMode === 'initiatives'
+                  viewMode === 'milestones'
                     ? 'bg-white text-gray-900 shadow-sm'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                Initiatives
+                Milestones
               </button>
             </div>
 
-            {viewMode === 'initiatives' ? (
+            {viewMode === 'milestones' ? (
               <button
-                onClick={() => setShowAddInitiativeModal(true)}
+                onClick={() => setShowAddMilestoneModal(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-[#c41a76] text-white rounded-lg hover:bg-[#a31562] transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
-                Add Initiative
+                Add Milestone
               </button>
             ) : (
               <button
@@ -471,13 +471,13 @@ export default function Home() {
           <div className="flex-1 flex items-center justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#c41a76]"></div>
           </div>
-        ) : viewMode === 'initiatives' ? (
-          <InitiativesList
-            initiatives={initiatives}
+        ) : viewMode === 'milestones' ? (
+          <MilestonesList
+            milestones={milestones}
             goals={allGoals}
             teamMembers={teamMembers}
-            onToggleAchieved={handleToggleInitiativeAchieved}
-            onDeleteInitiative={handleDeleteInitiative}
+            onToggleAchieved={handleToggleMilestoneAchieved}
+            onDeleteMilestone={handleDeleteMilestone}
           />
         ) : viewMode === 'overview' ? (
           <OverviewList goals={goals} teamMembers={teamMembers} />
@@ -486,13 +486,13 @@ export default function Home() {
             goals={goals}
             teamMembers={teamMembers}
             selectedMemberId={selectedMemberId}
-            initiatives={initiatives}
+            milestones={milestones}
             onUpdateGoalStatus={handleUpdateGoalStatus}
             onUpdateGoalPriority={handleUpdateGoalPriority}
             onAddGoalUpdate={handleAddGoalUpdate}
             onDeleteGoal={handleDeleteGoal}
             onEditGoalTitle={handleEditGoalTitle}
-            onLinkGoalToInitiative={handleLinkGoalToInitiative}
+            onLinkGoalToMilestone={handleLinkGoalToMilestone}
           />
         )}
       </div>
@@ -524,11 +524,10 @@ export default function Home() {
         onAdd={handleAddMember}
       />
 
-      <AddInitiativeModal
-        isOpen={showAddInitiativeModal}
-        onClose={() => setShowAddInitiativeModal(false)}
-        onAdd={handleAddInitiative}
-        teamMembers={teamMembers}
+      <AddMilestoneModal
+        isOpen={showAddMilestoneModal}
+        onClose={() => setShowAddMilestoneModal(false)}
+        onAdd={handleAddMilestone}
       />
     </div>
   );

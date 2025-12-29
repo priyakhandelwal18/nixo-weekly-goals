@@ -12,7 +12,7 @@ function getDefaultData(): AppData {
     ],
     goals: [],
     weeks: [currentWeek],
-    initiatives: [],
+    milestones: [],
   };
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { Goal, TeamMember, GoalStatus, Initiative } from '@/types';
+import { Goal, TeamMember, GoalStatus, Milestone } from '@/types';
 import { GoalCard } from './GoalCard';
 import { Avatar } from './Avatar';
 
@@ -8,26 +8,26 @@ interface GoalsListProps {
   goals: Goal[];
   teamMembers: TeamMember[];
   selectedMemberId: string | null;
-  initiatives: Initiative[];
+  milestones: Milestone[];
   onUpdateGoalStatus: (goalId: string, status: GoalStatus) => void;
   onUpdateGoalPriority: (goalId: string, priority: 1 | 2 | 3 | 4 | 5) => void;
   onAddGoalUpdate: (goalId: string, content: string) => void;
   onDeleteGoal: (goalId: string) => void;
   onEditGoalTitle: (goalId: string, title: string) => void;
-  onLinkGoalToInitiative: (goalId: string, initiativeId: string | null) => void;
+  onLinkGoalToMilestone: (goalId: string, milestoneId: string | null) => void;
 }
 
 export function GoalsList({
   goals,
   teamMembers,
   selectedMemberId,
-  initiatives,
+  milestones,
   onUpdateGoalStatus,
   onUpdateGoalPriority,
   onAddGoalUpdate,
   onDeleteGoal,
   onEditGoalTitle,
-  onLinkGoalToInitiative,
+  onLinkGoalToMilestone,
 }: GoalsListProps) {
   // Filter goals based on selected member
   const filteredGoals = selectedMemberId
@@ -84,13 +84,13 @@ export function GoalsList({
                   <GoalCard
                     goal={goal}
                     assignee={member}
-                    initiatives={initiatives}
+                    milestones={milestones}
                     onUpdateStatus={(status) => onUpdateGoalStatus(goal.id, status)}
                     onUpdatePriority={(priority) => onUpdateGoalPriority(goal.id, priority)}
                     onAddUpdate={(content) => onAddGoalUpdate(goal.id, content)}
                     onDelete={() => onDeleteGoal(goal.id)}
                     onEditTitle={(title) => onEditGoalTitle(goal.id, title)}
-                    onLinkToInitiative={(initiativeId) => onLinkGoalToInitiative(goal.id, initiativeId)}
+                    onLinkToMilestone={(milestoneId) => onLinkGoalToMilestone(goal.id, milestoneId)}
                   />
                 </li>
               ))}

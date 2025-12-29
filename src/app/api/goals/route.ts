@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGoalsForWeek, addGoal, updateGoal, deleteGoal, linkGoalToInitiative } from '@/lib/db';
+import { getGoalsForWeek, addGoal, updateGoal, deleteGoal, linkGoalToMilestone } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const { goalId, title, status, priority, initiativeId } = await request.json();
+    const { goalId, title, status, priority, milestoneId } = await request.json();
 
     if (!goalId) {
       return NextResponse.json(
@@ -60,9 +60,9 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // Handle initiative linking separately
-    if (initiativeId !== undefined) {
-      await linkGoalToInitiative(goalId, initiativeId);
+    // Handle milestone linking separately
+    if (milestoneId !== undefined) {
+      await linkGoalToMilestone(goalId, milestoneId);
     }
 
     // Handle other updates

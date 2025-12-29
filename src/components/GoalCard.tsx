@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Goal, TeamMember, GoalStatus, STATUS_LABELS, Initiative } from '@/types';
+import { Goal, TeamMember, GoalStatus, STATUS_LABELS, Milestone } from '@/types';
 import { Avatar } from './Avatar';
 import { StatusDropdown } from './StatusDropdown';
 import { PriorityStars } from './PriorityStars';
@@ -10,25 +10,25 @@ import { formatDate } from '@/lib/utils';
 interface GoalCardProps {
   goal: Goal;
   assignee: TeamMember | undefined;
-  initiatives: Initiative[];
+  milestones: Milestone[];
   onUpdateStatus: (status: GoalStatus) => void;
   onUpdatePriority: (priority: 1 | 2 | 3 | 4 | 5) => void;
   onAddUpdate: (content: string) => void;
   onDelete: () => void;
   onEditTitle: (title: string) => void;
-  onLinkToInitiative: (initiativeId: string | null) => void;
+  onLinkToMilestone: (milestoneId: string | null) => void;
 }
 
 export function GoalCard({
   goal,
   assignee,
-  initiatives,
+  milestones,
   onUpdateStatus,
   onUpdatePriority,
   onAddUpdate,
   onDelete,
   onEditTitle,
-  onLinkToInitiative,
+  onLinkToMilestone,
 }: GoalCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [newUpdate, setNewUpdate] = useState('');
@@ -38,7 +38,7 @@ export function GoalCard({
 
   const hasUpdates = goal.updates.length > 0;
   const statusLabel = STATUS_LABELS[goal.status];
-  const linkedInitiative = initiatives.find((i) => i.id === goal.initiativeId);
+  const linkedMilestone = milestones.find((m) => m.id === goal.milestoneId);
 
   const handleSaveTitle = () => {
     if (editedTitle.trim() && editedTitle !== goal.title) {
@@ -131,9 +131,9 @@ export function GoalCard({
                   <span className="text-sm text-gray-600">{assignee.name}</span>
                 </div>
               )}
-              {linkedInitiative && (
+              {linkedMilestone && (
                 <span className="text-xs px-2 py-0.5 rounded bg-[#ffbce1]/50 text-[#c41a76]">
-                  {linkedInitiative.title}
+                  {linkedMilestone.title}
                 </span>
               )}
             </div>
@@ -162,30 +162,30 @@ export function GoalCard({
                   Edit title
                 </button>
                 <div className="border-t border-gray-100 my-1" />
-                <div className="px-3 py-1 text-xs text-gray-500 font-medium">Link to Initiative</div>
+                <div className="px-3 py-1 text-xs text-gray-500 font-medium">Link to Milestone</div>
                 <button
                   onClick={() => {
-                    onLinkToInitiative(null);
+                    onLinkToMilestone(null);
                     setShowMenu(false);
                   }}
                   className={`w-full px-3 py-2 text-left hover:bg-gray-50 text-sm ${
-                    !goal.initiativeId ? 'text-[#c41a76] font-medium' : 'text-gray-700'
+                    !goal.milestoneId ? 'text-[#c41a76] font-medium' : 'text-gray-700'
                   }`}
                 >
                   None
                 </button>
-                {initiatives.map((initiative) => (
+                {milestones.map((milestone) => (
                   <button
-                    key={initiative.id}
+                    key={milestone.id}
                     onClick={() => {
-                      onLinkToInitiative(initiative.id);
+                      onLinkToMilestone(milestone.id);
                       setShowMenu(false);
                     }}
                     className={`w-full px-3 py-2 text-left hover:bg-gray-50 text-sm ${
-                      goal.initiativeId === initiative.id ? 'text-[#c41a76] font-medium' : 'text-gray-700'
+                      goal.milestoneId === milestone.id ? 'text-[#c41a76] font-medium' : 'text-gray-700'
                     }`}
                   >
-                    {initiative.title}
+                    {milestone.title}
                   </button>
                 ))}
                 <div className="border-t border-gray-100 my-1" />

@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { TeamMember, Goal, GoalStatus, GoalUpdate, Initiative } from '@/types';
+import { TeamMember, Goal, GoalStatus, GoalUpdate, Milestone } from '@/types';
 import { generateId, AVATAR_COLORS } from './utils';
 
 let supabase: SupabaseClient | null = null;
@@ -85,7 +85,7 @@ export async function getGoalsForWeek(weekId: string): Promise<Goal[]> {
       priority: row.priority as 1 | 2 | 3 | 4 | 5,
       assigneeId: row.assignee_id,
       weekId: row.week_id,
-      initiativeId: row.initiative_id || undefined,
+      milestoneId: row.milestone_id || undefined,
       createdAt: row.created_at,
       updates: (updatesData || []).map((u) => ({
         id: u.id,
@@ -199,10 +199,10 @@ export async function addGoalUpdate(
   };
 }
 
-// Initiative functions
-export async function getInitiatives(): Promise<Initiative[]> {
+// Milestone functions
+export async function getMilestones(): Promise<Milestone[]> {
   const { data, error } = await getSupabase()
-    .from('initiatives')
+    .from('milestones')
     .select('*')
     .order('deadline', { ascending: true });
 
@@ -212,29 +212,24 @@ export async function getInitiatives(): Promise<Initiative[]> {
     id: row.id,
     title: row.title,
     deadline: row.deadline,
-    assigneeId: row.assignee_id,
     achieved: row.achieved,
-    linkedGoalIds: row.linked_goal_ids || [],
     createdAt: row.created_at,
   }));
 }
 
-export async function addInitiative(
+export async function addMilestone(
   title: string,
-  deadline: string,
-  assigneeId: string
-): Promise<Initiative> {
+  deadline: string
+): Promise<Milestone> {
   const id = generateId();
 
   const { error } = await getSupabase()
-    .from('initiatives')
+    .from('milestones')
     .insert({
       id,
       title,
       deadline,
-      assignee_id: assigneeId,
       achieved: false,
-      linked_goal_ids: [],
     });
 
   if (error) throw error;
@@ -243,18 +238,16 @@ export async function addInitiative(
     id,
     title,
     deadline,
-    assigneeId,
     achieved: false,
-    linkedGoalIds: [],
     createdAt: new Date().toISOString(),
   };
 }
 
-export async function updateInitiative(
-  initiativeId: string,
-  updates: Partial<Pick<Initiative, 'title' | 'deadline' | 'achieved' | 'linkedGoalIds'>>
+export async function updateMilestone(
+  milestoneId: string,
+  updates: Partial<Pick<Milestone, 'title' | 'deadline' | 'achieved'>>
 ): Promise<void> {
-  const updateData: Record<string, string | boolean | string[]> = {};
+  const updateData: Record<string, string | boolean> = {};
 
   if (updates.title !== undefined) {
     updateData.title = updates.title;
@@ -265,42 +258,39 @@ export async function updateInitiative(
   if (updates.achieved !== undefined) {
     updateData.achieved = updates.achieved;
   }
-  if (updates.linkedGoalIds !== undefined) {
-    updateData.linked_goal_ids = updates.linkedGoalIds;
-  }
 
   if (Object.keys(updateData).length > 0) {
     const { error } = await getSupabase()
-      .from('initiatives')
+      .from('milestones')
       .update(updateData)
-      .eq('id', initiativeId);
+      .eq('id', milestoneId);
 
     if (error) throw error;
   }
 }
 
-export async function deleteInitiative(initiativeId: string): Promise<void> {
+export async function deleteMilestone(milestoneId: string): Promise<void> {
   // First unlink any goals
   await getSupabase()
     .from('goals')
-    .update({ initiative_id: null })
-    .eq('initiative_id', initiativeId);
+    .update({ milestone_id: null })
+    .eq('milestone_id', milestoneId);
 
   const { error } = await getSupabase()
-    .from('initiatives')
+    .from('milestones')
     .delete()
-    .eq('id', initiativeId);
+    .eq('id', milestoneId);
 
   if (error) throw error;
 }
 
-export async function linkGoalToInitiative(
+export async function linkGoalToMilestone(
   goalId: string,
-  initiativeId: string | null
+  milestoneId: string | null
 ): Promise<void> {
   const { error } = await getSupabase()
     .from('goals')
-    .update({ initiative_id: initiativeId })
+    .update({ milestone_id: milestoneId })
     .eq('id', goalId);
 
   if (error) throw error;

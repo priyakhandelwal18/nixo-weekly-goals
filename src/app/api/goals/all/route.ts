@@ -21,7 +21,7 @@ export async function GET() {
       priority: row.priority,
       assigneeId: row.assignee_id,
       weekId: row.week_id,
-      initiativeId: row.initiative_id || undefined,
+      milestoneId: row.milestone_id || undefined,
       createdAt: row.created_at,
       updates: [],
     }));
