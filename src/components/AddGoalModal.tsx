@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TeamMember } from '@/types';
 import { PriorityStars } from './PriorityStars';
 
 interface AddGoalModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (title: string, assigneeId: string, priority: 1 | 2 | 3 | 4 | 5) => void;
+  onAdd: (title: string, assigneeId: string, priority: 1 | 2 | 3 | 4 | 5) => Promise<void>;
   teamMembers: TeamMember[];
   defaultAssigneeId?: string;
 }
@@ -20,18 +20,34 @@ export function AddGoalModal({
   defaultAssigneeId,
 }: AddGoalModalProps) {
   const [title, setTitle] = useState('');
-  const [assigneeId, setAssigneeId] = useState(defaultAssigneeId || teamMembers[0]?.id || '');
+  const [assigneeId, setAssigneeId] = useState('');
   const [priority, setPriority] = useState<1 | 2 | 3 | 4 | 5>(3);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Set default assignee when modal opens or team members change
+  useEffect(() => {
+    if (isOpen) {
+      const defaultId = defaultAssigneeId || teamMembers[0]?.id || '';
+      setAssigneeId(defaultId);
+    }
+  }, [isOpen, defaultAssigneeId, teamMembers]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (title.trim() && assigneeId) {
-      onAdd(title.trim(), assigneeId, priority);
+    if (!title.trim() || !assigneeId || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      await onAdd(title.trim(), assigneeId, priority);
       setTitle('');
       setPriority(3);
       onClose();
+    } catch (error) {
+      console.error('Failed to add goal:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -88,16 +104,17 @@ export function AddGoalModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={!title.trim() || !assigneeId}
+              disabled={!title.trim() || !assigneeId || isSubmitting}
               className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              Add Goal
+              {isSubmitting ? 'Adding...' : 'Add Goal'}
             </button>
           </div>
         </form>
