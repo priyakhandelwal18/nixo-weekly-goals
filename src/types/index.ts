@@ -13,6 +13,7 @@ export interface Goal {
   priority: 1 | 2 | 3 | 4 | 5;
   assigneeId: string;
   weekId: string;
+  initiativeId?: string;
   updates: GoalUpdate[];
   createdAt: string;
 }
@@ -39,10 +40,21 @@ export interface Week {
   endDate: string;
 }
 
+export interface Initiative {
+  id: string;
+  title: string;
+  deadline: string;
+  assigneeId: string;
+  achieved: boolean;
+  linkedGoalIds: string[];
+  createdAt: string;
+}
+
 export interface AppData {
   teamMembers: TeamMember[];
   goals: Goal[];
   weeks: Week[];
+  initiatives: Initiative[];
 }
 
 export const STATUS_LABELS: Record<GoalStatus, string> = {

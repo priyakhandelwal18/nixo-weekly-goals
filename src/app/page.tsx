@@ -1,27 +1,32 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { TeamMember, Goal, GoalStatus } from '@/types';
+import { TeamMember, Goal, GoalStatus, Initiative } from '@/types';
 import { getCurrentWeek, getWeekFromId, getAdjacentWeek } from '@/lib/utils';
 import { TeamSidebar } from '@/components/TeamSidebar';
 import { GoalsList } from '@/components/GoalsList';
 import { WeekSelector } from '@/components/WeekSelector';
 import { AddGoalModal } from '@/components/AddGoalModal';
 import { AddMemberModal } from '@/components/AddMemberModal';
+import { AddInitiativeModal } from '@/components/AddInitiativeModal';
 import { LoginPage } from '@/components/LoginPage';
 import { OverviewList } from '@/components/OverviewList';
+import { InitiativesList } from '@/components/InitiativesList';
 
-type ViewMode = 'detailed' | 'overview';
+type ViewMode = 'detailed' | 'overview' | 'initiatives';
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [allGoals, setAllGoals] = useState<Goal[]>([]);
   const [lastWeekGoals, setLastWeekGoals] = useState<Goal[]>([]);
+  const [initiatives, setInitiatives] = useState<Initiative[]>([]);
   const [currentWeekId, setCurrentWeekId] = useState<string>('');
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [showAddGoalModal, setShowAddGoalModal] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [showAddInitiativeModal, setShowAddInitiativeModal] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('detailed');
   const [loading, setLoading] = useState(true);
 
@@ -40,10 +45,11 @@ export default function Home() {
     const lastWeekId = getAdjacentWeek(currentWeekId, 'prev');
 
     try {
-      const [membersRes, goalsRes, lastWeekGoalsRes] = await Promise.all([
+      const [membersRes, goalsRes, lastWeekGoalsRes, initiativesRes] = await Promise.all([
         fetch('/api/team-members'),
         fetch(`/api/goals?weekId=${currentWeekId}`),
         fetch(`/api/goals?weekId=${lastWeekId}`),
+        fetch('/api/initiatives'),
       ]);
 
       if (membersRes.ok && goalsRes.ok) {
@@ -56,6 +62,18 @@ export default function Home() {
       if (lastWeekGoalsRes.ok) {
         const lastWeekGoalsData = await lastWeekGoalsRes.json();
         setLastWeekGoals(lastWeekGoalsData);
+      }
+
+      if (initiativesRes.ok) {
+        const initiativesData = await initiativesRes.json();
+        setInitiatives(initiativesData);
+      }
+
+      // Load all goals for initiative linking display
+      const allGoalsRes = await fetch('/api/goals/all');
+      if (allGoalsRes.ok) {
+        const allGoalsData = await allGoalsRes.json();
+        setAllGoals(allGoalsData);
       }
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -234,16 +252,86 @@ export default function Home() {
     }
   };
 
+  const handleLinkGoalToInitiative = async (goalId: string, initiativeId: string | null) => {
+    try {
+      const res = await fetch('/api/goals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goalId, initiativeId }),
+      });
+
+      if (res.ok) {
+        setGoals(goals.map((g) => (g.id === goalId ? { ...g, initiativeId: initiativeId || undefined } : g)));
+        setAllGoals(allGoals.map((g) => (g.id === goalId ? { ...g, initiativeId: initiativeId || undefined } : g)));
+      }
+    } catch (error) {
+      console.error('Failed to link goal to initiative:', error);
+    }
+  };
+
   const handleSelectWeek = (weekId: string) => {
     setCurrentWeekId(weekId);
     setLoading(true);
   };
 
+  // Initiative handlers
+  const handleAddInitiative = async (title: string, deadline: string, assigneeId: string) => {
+    try {
+      const res = await fetch('/api/initiatives', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, deadline, assigneeId }),
+      });
+
+      if (res.ok) {
+        const newInitiative = await res.json();
+        setInitiatives([...initiatives, newInitiative]);
+      } else {
+        const errorData = await res.json();
+        console.error('Failed to add initiative:', errorData);
+        alert(`Failed to add initiative: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Failed to add initiative:', error);
+      alert('Failed to add initiative. Please try again.');
+    }
+  };
+
+  const handleToggleInitiativeAchieved = async (initiativeId: string, achieved: boolean) => {
+    try {
+      const res = await fetch('/api/initiatives', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initiativeId, achieved }),
+      });
+
+      if (res.ok) {
+        setInitiatives(initiatives.map((i) => (i.id === initiativeId ? { ...i, achieved } : i)));
+      }
+    } catch (error) {
+      console.error('Failed to update initiative:', error);
+    }
+  };
+
+  const handleDeleteInitiative = async (initiativeId: string) => {
+    try {
+      const res = await fetch(`/api/initiatives?id=${initiativeId}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        setInitiatives(initiatives.filter((i) => i.id !== initiativeId));
+      }
+    } catch (error) {
+      console.error('Failed to delete initiative:', error);
+    }
+  };
+
   // Show loading state while checking auth
   if (isAuthenticated === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#c41a76]"></div>
       </div>
     );
   }
@@ -261,7 +349,7 @@ export default function Home() {
   const completionRate = totalGoals > 0 ? Math.round((doneGoals / totalGoals) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-white flex">
       {/* Left Sidebar - Last Week (read-only) */}
       <TeamSidebar
         title="Last Week"
@@ -298,7 +386,7 @@ export default function Home() {
                   completionRate >= 50 && completionRate <= 70
                     ? 'text-green-600'
                     : completionRate > 70
-                    ? 'text-blue-600'
+                    ? 'text-[#c41a76]'
                     : 'text-amber-600'
                 }`}
               >
@@ -312,7 +400,7 @@ export default function Home() {
 
           <div className="flex items-center gap-3">
             {/* View Mode Toggle */}
-            <div className="flex bg-gray-100 rounded-lg p-1">
+            <div className="flex bg-[#ffbce1]/30 rounded-lg p-1">
               <button
                 onClick={() => setViewMode('detailed')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
@@ -333,17 +421,39 @@ export default function Home() {
               >
                 Overview
               </button>
+              <button
+                onClick={() => setViewMode('initiatives')}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  viewMode === 'initiatives'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Initiatives
+              </button>
             </div>
 
-            <button
-              onClick={() => setShowAddGoalModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              Add Goal
-            </button>
+            {viewMode === 'initiatives' ? (
+              <button
+                onClick={() => setShowAddInitiativeModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-[#c41a76] text-white rounded-lg hover:bg-[#a31562] transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Add Initiative
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowAddGoalModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-[#c41a76] text-white rounded-lg hover:bg-[#a31562] transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Add Goal
+              </button>
+            )}
 
             <button
               onClick={handleLogout}
@@ -359,8 +469,16 @@ export default function Home() {
 
         {loading ? (
           <div className="flex-1 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#c41a76]"></div>
           </div>
+        ) : viewMode === 'initiatives' ? (
+          <InitiativesList
+            initiatives={initiatives}
+            goals={allGoals}
+            teamMembers={teamMembers}
+            onToggleAchieved={handleToggleInitiativeAchieved}
+            onDeleteInitiative={handleDeleteInitiative}
+          />
         ) : viewMode === 'overview' ? (
           <OverviewList goals={goals} teamMembers={teamMembers} />
         ) : (
@@ -368,11 +486,13 @@ export default function Home() {
             goals={goals}
             teamMembers={teamMembers}
             selectedMemberId={selectedMemberId}
+            initiatives={initiatives}
             onUpdateGoalStatus={handleUpdateGoalStatus}
             onUpdateGoalPriority={handleUpdateGoalPriority}
             onAddGoalUpdate={handleAddGoalUpdate}
             onDeleteGoal={handleDeleteGoal}
             onEditGoalTitle={handleEditGoalTitle}
+            onLinkGoalToInitiative={handleLinkGoalToInitiative}
           />
         )}
       </div>
@@ -402,6 +522,13 @@ export default function Home() {
         isOpen={showAddMemberModal}
         onClose={() => setShowAddMemberModal(false)}
         onAdd={handleAddMember}
+      />
+
+      <AddInitiativeModal
+        isOpen={showAddInitiativeModal}
+        onClose={() => setShowAddInitiativeModal(false)}
+        onAdd={handleAddInitiative}
+        teamMembers={teamMembers}
       />
     </div>
   );

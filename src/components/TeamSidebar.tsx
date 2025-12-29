@@ -36,7 +36,7 @@ export function TeamSidebar({
   const [hoveredMemberId, setHoveredMemberId] = useState<string | null>(null);
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
+    <div className="w-64 bg-white border-r border-[#ffbce1]/30 flex flex-col h-full">
       <div className="p-4 border-b border-gray-100 flex items-center justify-between">
         <div className="flex items-center gap-2 text-gray-600">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -47,7 +47,7 @@ export function TeamSidebar({
         {showManagement && onAddMember && (
           <button
             onClick={onAddMember}
-            className="text-blue-500 hover:text-blue-600 text-sm"
+            className="text-[#c41a76] hover:text-[#a31562] text-sm"
             title="Add team member"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -67,7 +67,7 @@ export function TeamSidebar({
             <div
               key={member.id}
               className={`px-4 py-3 cursor-pointer transition-colors relative ${
-                isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
+                isSelected ? 'bg-[#ffbce1]/20' : 'hover:bg-[#ffbce1]/10'
               }`}
               onClick={() => onSelectMember(isSelected ? null : member.id)}
               onMouseEnter={() => setHoveredMemberId(member.id)}

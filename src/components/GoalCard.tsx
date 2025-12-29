@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Goal, TeamMember, GoalStatus, STATUS_LABELS } from '@/types';
+import { Goal, TeamMember, GoalStatus, STATUS_LABELS, Initiative } from '@/types';
 import { Avatar } from './Avatar';
 import { StatusDropdown } from './StatusDropdown';
 import { PriorityStars } from './PriorityStars';
@@ -10,21 +10,25 @@ import { formatDate } from '@/lib/utils';
 interface GoalCardProps {
   goal: Goal;
   assignee: TeamMember | undefined;
+  initiatives: Initiative[];
   onUpdateStatus: (status: GoalStatus) => void;
   onUpdatePriority: (priority: 1 | 2 | 3 | 4 | 5) => void;
   onAddUpdate: (content: string) => void;
   onDelete: () => void;
   onEditTitle: (title: string) => void;
+  onLinkToInitiative: (initiativeId: string | null) => void;
 }
 
 export function GoalCard({
   goal,
   assignee,
+  initiatives,
   onUpdateStatus,
   onUpdatePriority,
   onAddUpdate,
   onDelete,
   onEditTitle,
+  onLinkToInitiative,
 }: GoalCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [newUpdate, setNewUpdate] = useState('');
@@ -34,6 +38,7 @@ export function GoalCard({
 
   const hasUpdates = goal.updates.length > 0;
   const statusLabel = STATUS_LABELS[goal.status];
+  const linkedInitiative = initiatives.find((i) => i.id === goal.initiativeId);
 
   const handleSaveTitle = () => {
     if (editedTitle.trim() && editedTitle !== goal.title) {
@@ -52,7 +57,7 @@ export function GoalCard({
   return (
     <div
       className={`border border-gray-200 rounded-lg mb-3 transition-all ${
-        hasUpdates ? 'bg-amber-50 border-amber-200' : 'bg-white'
+        hasUpdates ? 'bg-[#ffbce1]/20 border-[#ffbce1]' : 'bg-white'
       }`}
     >
       <div className="p-4">
@@ -74,12 +79,12 @@ export function GoalCard({
                       setIsEditing(false);
                     }
                   }}
-                  className="flex-1 px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                  className="flex-1 px-2 py-1 border border-[#c41a76] rounded focus:outline-none focus:ring-2 focus:ring-[#c41a76] text-gray-900"
                   autoFocus
                 />
               ) : (
                 <h3
-                  className="font-medium text-gray-900 cursor-pointer hover:text-blue-600"
+                  className="font-medium text-gray-900 cursor-pointer hover:text-[#c41a76]"
                   onClick={() => setIsEditing(true)}
                 >
                   {goal.title}
@@ -88,7 +93,7 @@ export function GoalCard({
               {hasUpdates && (
                 <button
                   onClick={() => setIsExpanded(!isExpanded)}
-                  className="flex items-center gap-1 text-blue-500 hover:text-blue-600 text-sm"
+                  className="flex items-center gap-1 text-[#c41a76] hover:text-[#a31562] text-sm"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -98,7 +103,7 @@ export function GoalCard({
               )}
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="text-blue-500 hover:text-blue-600 text-sm"
+                className="text-[#c41a76] hover:text-[#a31562] text-sm"
               >
                 Add update
               </button>
@@ -126,6 +131,11 @@ export function GoalCard({
                   <span className="text-sm text-gray-600">{assignee.name}</span>
                 </div>
               )}
+              {linkedInitiative && (
+                <span className="text-xs px-2 py-0.5 rounded bg-[#ffbce1]/50 text-[#c41a76]">
+                  {linkedInitiative.title}
+                </span>
+              )}
             </div>
           </div>
 
@@ -141,7 +151,7 @@ export function GoalCard({
               </svg>
             </button>
             {showMenu && (
-              <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-32">
+              <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-40">
                 <button
                   onClick={() => {
                     setIsEditing(true);
@@ -151,6 +161,34 @@ export function GoalCard({
                 >
                   Edit title
                 </button>
+                <div className="border-t border-gray-100 my-1" />
+                <div className="px-3 py-1 text-xs text-gray-500 font-medium">Link to Initiative</div>
+                <button
+                  onClick={() => {
+                    onLinkToInitiative(null);
+                    setShowMenu(false);
+                  }}
+                  className={`w-full px-3 py-2 text-left hover:bg-gray-50 text-sm ${
+                    !goal.initiativeId ? 'text-[#c41a76] font-medium' : 'text-gray-700'
+                  }`}
+                >
+                  None
+                </button>
+                {initiatives.map((initiative) => (
+                  <button
+                    key={initiative.id}
+                    onClick={() => {
+                      onLinkToInitiative(initiative.id);
+                      setShowMenu(false);
+                    }}
+                    className={`w-full px-3 py-2 text-left hover:bg-gray-50 text-sm ${
+                      goal.initiativeId === initiative.id ? 'text-[#c41a76] font-medium' : 'text-gray-700'
+                    }`}
+                  >
+                    {initiative.title}
+                  </button>
+                ))}
+                <div className="border-t border-gray-100 my-1" />
                 <button
                   onClick={() => {
                     onDelete();
@@ -183,7 +221,7 @@ export function GoalCard({
               value={newUpdate}
               onChange={(e) => setNewUpdate(e.target.value)}
               placeholder="Add an update..."
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c41a76]"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleAddUpdate();
               }}
@@ -191,7 +229,7 @@ export function GoalCard({
             <button
               onClick={handleAddUpdate}
               disabled={!newUpdate.trim()}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-[#c41a76] text-white rounded-lg text-sm hover:bg-[#a31562] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Add
             </button>

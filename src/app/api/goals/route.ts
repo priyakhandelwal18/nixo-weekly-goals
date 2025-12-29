@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGoalsForWeek, addGoal, updateGoal, deleteGoal } from '@/lib/db';
+import { getGoalsForWeek, addGoal, updateGoal, deleteGoal, linkGoalToInitiative } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const { goalId, title, status, priority } = await request.json();
+    const { goalId, title, status, priority, initiativeId } = await request.json();
 
     if (!goalId) {
       return NextResponse.json(
@@ -60,7 +60,16 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    await updateGoal(goalId, { title, status, priority });
+    // Handle initiative linking separately
+    if (initiativeId !== undefined) {
+      await linkGoalToInitiative(goalId, initiativeId);
+    }
+
+    // Handle other updates
+    if (title !== undefined || status !== undefined || priority !== undefined) {
+      await updateGoal(goalId, { title, status, priority });
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Failed to update goal:', error);

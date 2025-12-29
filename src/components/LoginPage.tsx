@@ -36,10 +36,10 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+    <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md border border-[#ffbce1]/30">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Nixo Weekly Goals</h1>
+          <h1 className="text-2xl font-bold text-[#c41a76]">Nixo Weekly Goals</h1>
           <p className="text-gray-500 mt-2">Enter team password to continue</p>
         </div>
 
@@ -53,7 +53,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#c41a76]"
               autoFocus
             />
           </div>
@@ -65,7 +65,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           <button
             type="submit"
             disabled={loading || !password}
-            className="w-full py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full py-3 bg-[#c41a76] text-white rounded-lg font-medium hover:bg-[#a31562] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
