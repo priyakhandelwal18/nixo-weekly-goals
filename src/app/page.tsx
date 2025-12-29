@@ -9,7 +9,7 @@ import { WeekSelector } from '@/components/WeekSelector';
 import { AddGoalModal } from '@/components/AddGoalModal';
 import { AddMemberModal } from '@/components/AddMemberModal';
 import { LoginPage } from '@/components/LoginPage';
-import { TeamOverview } from '@/components/TeamOverview';
+import { OverviewList } from '@/components/OverviewList';
 
 type ViewMode = 'detailed' | 'overview';
 
@@ -262,16 +262,14 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Left Sidebar - This Week */}
+      {/* Left Sidebar - Last Week (read-only) */}
       <TeamSidebar
-        title="This Week"
+        title="Last Week"
         members={teamMembers}
-        goals={goals}
+        goals={lastWeekGoals}
         selectedMemberId={selectedMemberId}
         onSelectMember={setSelectedMemberId}
-        onAddMember={() => setShowAddMemberModal(true)}
-        onRemoveMember={handleRemoveMember}
-        showManagement={true}
+        showManagement={false}
       />
 
       {/* Main Content */}
@@ -364,7 +362,7 @@ export default function Home() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
           </div>
         ) : viewMode === 'overview' ? (
-          <TeamOverview goals={goals} lastWeekGoals={lastWeekGoals} teamMembers={teamMembers} />
+          <OverviewList goals={goals} teamMembers={teamMembers} />
         ) : (
           <GoalsList
             goals={goals}
@@ -378,6 +376,18 @@ export default function Home() {
           />
         )}
       </div>
+
+      {/* Right Sidebar - This Week (with management) */}
+      <TeamSidebar
+        title="This Week"
+        members={teamMembers}
+        goals={goals}
+        selectedMemberId={selectedMemberId}
+        onSelectMember={setSelectedMemberId}
+        onAddMember={() => setShowAddMemberModal(true)}
+        onRemoveMember={handleRemoveMember}
+        showManagement={true}
+      />
 
       {/* Modals */}
       <AddGoalModal
