@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { TeamMember, Goal, GoalStatus } from '@/types';
-import { getCurrentWeek, getWeekFromId } from '@/lib/utils';
+import { getCurrentWeek, getWeekFromId, getAdjacentWeek } from '@/lib/utils';
 import { TeamSidebar } from '@/components/TeamSidebar';
 import { GoalsList } from '@/components/GoalsList';
 import { WeekSelector } from '@/components/WeekSelector';
@@ -17,6 +17,7 @@ export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [lastWeekGoals, setLastWeekGoals] = useState<Goal[]>([]);
   const [currentWeekId, setCurrentWeekId] = useState<string>('');
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [showAddGoalModal, setShowAddGoalModal] = useState(false);
@@ -36,10 +37,13 @@ export default function Home() {
   const loadData = useCallback(async () => {
     if (!currentWeekId) return;
 
+    const lastWeekId = getAdjacentWeek(currentWeekId, 'prev');
+
     try {
-      const [membersRes, goalsRes] = await Promise.all([
+      const [membersRes, goalsRes, lastWeekGoalsRes] = await Promise.all([
         fetch('/api/team-members'),
         fetch(`/api/goals?weekId=${currentWeekId}`),
+        fetch(`/api/goals?weekId=${lastWeekId}`),
       ]);
 
       if (membersRes.ok && goalsRes.ok) {
@@ -47,6 +51,11 @@ export default function Home() {
         const goalsData = await goalsRes.json();
         setTeamMembers(members);
         setGoals(goalsData);
+      }
+
+      if (lastWeekGoalsRes.ok) {
+        const lastWeekGoalsData = await lastWeekGoalsRes.json();
+        setLastWeekGoals(lastWeekGoalsData);
       }
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -355,7 +364,7 @@ export default function Home() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
           </div>
         ) : viewMode === 'overview' ? (
-          <TeamOverview goals={goals} teamMembers={teamMembers} />
+          <TeamOverview goals={goals} lastWeekGoals={lastWeekGoals} teamMembers={teamMembers} />
         ) : (
           <GoalsList
             goals={goals}
