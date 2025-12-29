@@ -12,20 +12,26 @@ interface MilestonesListProps {
   onDeleteMilestone: (milestoneId: string) => void;
 }
 
+function parseLocalDate(dateStr: string): Date {
+  // Parse date string as local date (not UTC) to avoid timezone shifts
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
 function formatDeadline(dateStr: string): string {
-  const date = new Date(dateStr);
+  const date = parseLocalDate(dateStr);
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function isOverdue(dateStr: string): boolean {
-  const deadline = new Date(dateStr);
+  const deadline = parseLocalDate(dateStr);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return deadline < today;
 }
 
 function getDaysUntil(dateStr: string): number {
-  const deadline = new Date(dateStr);
+  const deadline = parseLocalDate(dateStr);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   deadline.setHours(0, 0, 0, 0);
